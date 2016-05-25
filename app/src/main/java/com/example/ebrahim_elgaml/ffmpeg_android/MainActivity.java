@@ -29,48 +29,33 @@ public class MainActivity extends AppCompatActivity {
     private static final String[] engineVideoParams = new String[]{"-c:v",  "libx264", "-profile:v", "baseline", "-level", "3.0", "-b:v", "800k"
     , "-g", "10", "-qmin", "10", "-qmax", "51", "-i_qfactor", "0.71", "-qcomp", "0.6", "-me_method", "hex"
     , "-subq", "5", "-pix_fmt", "yuv420p"};
-    private VideoView myVideoView;
+    private AlphaVideoView myVideoView;
     private ProgressDialog progressDialog;
-    private boolean isPlayed = false;
     private MediaController mediaControls;
     private  long startTime = System.currentTimeMillis();
     private int myCounter = 0;
-//    private PlayThred th;
+    private  Uri videoURI;
     private  boolean isFinshied = false;
-    private boolean isStarted = false;
+    private int position = 0;
+    private boolean seek = false;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         myTextView = (TextView)(findViewById(R.id.mTextView));
-        myVideoView = (VideoView)(findViewById(R.id.videoView));
+        myVideoView = (AlphaVideoView)(findViewById(R.id.videoView));
+        myVideoView.setVideoViewListener(mVideoViewListener);
+        myVideoView.setOnCompletionListener(mVideoViewCompleteListener);
         Drawable d = Drawable.createFromPath(IMAGE_PATH + "bg.jpg");
         mediaControls = new MediaController(this);
 //        myVideoView.setBackground(d);
-//        playVideoOriginal(VIDEO_PATH +"ojob4_Full1_pre_full.mp4_alpha.mp4_transparent.ts" );
+        videoURI = Uri.parse(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts");
+        startTime = System.currentTimeMillis();
+//        new MyThread().start();
         final String[] command = formFFMPEGCommand(15, 29.27, "bg.jpg", "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1");
         final Context myContext = this;
         final FFmpeg ffmpeg = FFmpeg.getInstance(myContext);
-//        myVideoView.post(new Runnable() {
-//            @Override
-//            public void run() {
-//                while (!isFinshied) {
-//                    if (myVideoView.getCurrentPosition() <= 0) {
-//                        if (System.currentTimeMillis() - startTime > 3000) {
-//                            playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", false);
-//                            startTime = System.currentTimeMillis();
-//                        }
-//                    } else {
-//                        if (myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 100) {
-//                            playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", true);
-//                            myCounter++;
-//                            startTime = System.currentTimeMillis();
-//                        }
-//                    }
-//                }
-//
-//            }
-//        });
+
         try {
             ffmpeg.loadBinary(new LoadBinaryResponseHandler() {
                 @Override
@@ -84,13 +69,6 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onSuccess() {
                     try {
-                        // to execute "ffmpeg -version" command you just need to pass "-version"
-
-                        String folder = Environment.getExternalStorageDirectory() + "";
-                        String cmd = " http://res.cloudinary.com/ebrahim-elgaml/video/upload/v1463137785/wl2glc7odcbid6flyvok.mp4 ";
-                        String testFile = Environment.getExternalStorageDirectory() + "/test.mp4";
-//                        th = new PlayThred();
-//                        th.start();
                         ffmpeg.execute(command, new ExecuteBinaryResponseHandler() {
                             @Override
                             public void onStart() {
@@ -99,78 +77,64 @@ public class MainActivity extends AppCompatActivity {
                                 progressDialog.setCancelable(true);
                                 startTime = System.currentTimeMillis();
                                 Log.i("FFMPEG_TRAC", "STARETED");
-
+//
                             }
                             @Override
                             public void onProgress(String message) {
-//                                if( !isStarted && myVideoView.getCurrentPosition() <= 0) {
-//                                    if(System.currentTimeMillis() - startTime > 3000 ){
-//                                        myVideoView.post(new Runnable() {
-//                                            @Override
-//                                            public void run() {
-//                                                playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", false);
-//                                                isStarted = true;
-//                                            }
-//                                        });
-//
-//                                        startTime = System.currentTimeMillis();
-//                                    }
-//                                }else{
-//                                    if(myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 100){
-//                                        myVideoView.post(new Runnable() {
-//                                            @Override
-//                                            public void run() {
-//                                                playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", true);
-//                                            }
-//                                        });
-//
-//                                        myCounter++;
-//                                        startTime = System.currentTimeMillis();
-//                                    }
-//                                }
-                                if(System.currentTimeMillis() - startTime > 3000 ){
-                                    if(myVideoView.getCurrentPosition() <= 0){
-                                        playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", false);
+                                if(myVideoView.getCurrentPosition() <= 0){
+                                    if(System.currentTimeMillis() - startTime > 3000 ) {
+                                        playVideoOriginal();
+                                        seek = true;
                                         startTime = System.currentTimeMillis();
-                                    }
-//                                    playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts");
-//                                    th.start();
-//                                    isPlayed = true;
-                                }
-                                if(myVideoView.getCurrentPosition() > 0 && myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 500){
-                                    playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", true);
 
-                                    startTime = System.currentTimeMillis();
-                                    myCounter++;
+                                    }
+                                }else{
+                                    if( myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 1000){
+//                                        myVideoView.post(new Runnable() {
+//                                            @Override
+//                                            public void run() {
+//                                                if(myVideoView.canSeekForward()) {
+//                                                    if (myVideoView.getCurrentPosition() > myVideoView.getDuration()) {
+//                                                        position = myVideoView.getDuration();
+//                                                    } else {
+//                                                        position = myVideoView.getCurrentPosition();
+//                                                    }
+//                                                    if(position > 0) {
+//                                                        playVideoOriginal();
+//                                                    }
+//                                                }
+//                                            }
+//                                        });
+                                        startTime = System.currentTimeMillis();
+                                        myCounter++;
+                                    }
                                 }
-//                                ;
                                 Log.i("FFMPEG_TRAC", message);
                             }
-
                             @Override
                             public void onFailure(String message) {
-                                Toast.makeText(myContext, message, Toast.LENGTH_LONG);
+//                                Toast.makeText(myContext, message, Toast.LENGTH_LONG);
                                 Log.i("FFMPEG_TRAC", message);
                             }
 
                             @Override
                             public void onSuccess(String message) {
-                                Toast.makeText(myContext, message, Toast.LENGTH_LONG);
+//                                Toast.makeText(myContext, message, Toast.LENGTH_LONG);
+                                isFinshied = true;
                                 myTextView.post(new Runnable() {
                                     @Override
                                     public void run() {
                                         myTextView.setText("Time elapsed in milliseconds : " + (System.currentTimeMillis() - startTime) + ", Counter : " + myCounter);
                                     }
                                 });
-                                playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", true);
+                                playVideoOriginal();
                                 Log.i("FFMPEG_TRAC", message);
                             }
 
                             @Override
                             public void onFinish() {
-                                Toast.makeText(myContext, "Fininsh", Toast.LENGTH_LONG);
+//                                Toast.makeText(myContext, "Fininsh", Toast.LENGTH_LONG);
                                 Log.i("FFMPEG_TRAC", "FINISH");
-//                                th.setIsFinished(true);
                                 isFinshied = true;
                             }
                         });
@@ -220,134 +184,95 @@ public class MainActivity extends AppCompatActivity {
         }
         return command;
     }
-    public  void playVideoOriginal(String videoPath, final boolean seek) {
+    private AlphaVideoView.IVideoViewActionListener mVideoViewListener = new AlphaVideoView.IVideoViewActionListener()
+    {
+        @Override
+        public void onTimeBarSeekChanged(int currentTime)
+        {
+            //TODO what you want
+            myVideoView.start();
+        }
+
+        @Override
+        public void onResume()
+        {
+            //TODO what you want
+        }
+
+        @Override
+        public void onPause()
+        {
+            //TODO what you want
+        }
+    };
+
+    private MediaPlayer.OnCompletionListener mVideoViewCompleteListener = new MediaPlayer.OnCompletionListener()
+    {
+        @Override
+        public void onCompletion(MediaPlayer mp) {
+            if(!isFinshied) {
+                position = myVideoView.getDuration() - 100;
+                playVideoOriginal();
+            }
+        }
+
+    };
+    public  void playVideoOriginal() {
         try {
-            getWindow().setFormat(PixelFormat.TRANSLUCENT);
-            final int position = myVideoView.getCurrentPosition();
-//            mediaControls.setAnchorView(myVideoView);
-            Uri video = Uri.parse(videoPath);
-//            myVideoView.setMediaController(mediaControls);
-            myVideoView.setVideoURI(video);
+            Log.i("THREAD_TRAC", "SEEK : " + seek + " And postion is : " +  position);
+            if(seek && position <= 0) {
+                position = myVideoView.getDuration() - 100;
+            }
+            myVideoView.setVideoURI(videoURI);
+            progressDialog.dismiss();
             myVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 public void onPrepared(MediaPlayer mp) {
-                    progressDialog.dismiss();
-                    // videoViewOriginal.setAlpha(1.0f);
-                    if(seek) {
-                        myVideoView.seekTo(position);
-                    }
-                    myVideoView.start();
+                    myVideoView.seekTo(position);
+//                    myVideoView.seekTo(position);
+//                    if(seek) {
+//                        myVideoView.seekTo(position);
+//                    }else{
+//                        myVideoView.seekTo(0);
+//                        progressDialog.dismiss();
+//                        seek = true;
+//                    }
+
                 }
             });
         } catch (Exception e) {
             progressDialog.dismiss();
         }
     }
-    public class PlayThred extends Thread{
-        // dealing with time as millisecond
-        private String videoPath;
-        private int videoTime;
-        private int seekTime;
-        private boolean isFinished;
-        private int lastPlayedTime;
-        private boolean isFirstPlayed = false;
-        public PlayThred()
-        {
-            super("PlayThred");
+
+    public class MyThread extends Thread {
+        public MyThread(){
+            super("My Thread");
         }
-        public PlayThred(String path)
-        {
-            super("PlayThred");
-            videoPath = path;
-        }
-        public void run(){
-            while(!isFinished){
-                if(myVideoView.getCurrentPosition() <= 0){
-                    if(System.currentTimeMillis() - startTime > 3000 ){
-                        playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", false);
-                        startTime = System.currentTimeMillis();
-                    }
-                }else{
-                    if(myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 100){
-                        playVideoOriginal(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts", true);
-                        myCounter++;
-                        startTime = System.currentTimeMillis();
-                    }
-                }
-//                if(isFirstPlayed){
-//                   seekTime = myVideoView.getCurrentPosition();
-//                }else{
-//                    seekTime = 0;
-//                    isFirstPlayed = true;
-//                }
-//                playVideoOriginal();
-//                try {
-//                    sleep(2000);
-//                } catch (InterruptedException e) {
-//                    e.printStackTrace();
-//                }
+        public void run() {
+            while (!isFinshied) {
+                        if (myVideoView.getCurrentPosition() <= 0) {
+                            if (System.currentTimeMillis() - startTime > 6000) {
+                                playVideoOriginal();
+                                seek = true;
+                                startTime = System.currentTimeMillis();
+
+                            }
+                        } else {
+                            if (myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 500) {
+                                if (myVideoView.canSeekForward()) {
+                                    if (myVideoView.getCurrentPosition() > myVideoView.getDuration()) {
+                                        position = myVideoView.getDuration() - 100;
+                                    } else {
+                                        position = myVideoView.getCurrentPosition();
+                                    }
+                                    playVideoOriginal();
+                                }
+                                startTime = System.currentTimeMillis();
+                                myCounter++;
+                            }
+                        }
             }
         }
-
-        public String getVideoPath() {
-            return videoPath;
-        }
-
-        public void setVideoPath(String videoPath) {
-            this.videoPath = videoPath;
-        }
-
-        public int getVideoTime() {
-            return videoTime;
-        }
-
-        public void setVideoTime(int videoTime) {
-            this.videoTime = videoTime;
-        }
-
-        public int getSeekTime() {
-            return seekTime;
-        }
-
-        public void setSeekTime(int seekTime) {
-            this.seekTime = seekTime;
-        }
-
-        public boolean isFinished() {
-            return isFinished;
-        }
-
-        public void setIsFinished(boolean isFinished) {
-            this.isFinished = isFinished;
-        }
-
-        public int getLastPlayedTime() {
-            return lastPlayedTime;
-        }
-
-        public void setLastPlayedTime(int lastPlayedTime) {
-            this.lastPlayedTime = lastPlayedTime;
-        }
-//        public  void playVideoOriginal(String videoPath, final boolean seek) {
-//            try {
-//                getWindow().setFormat(PixelFormat.TRANSLUCENT);
-//                final int position = myVideoView.getCurrentPosition();
-////            mediaControls.setAnchorView(myVideoView);
-//                Uri video = Uri.parse(videoPath);
-////            myVideoView.setMediaController(mediaControls);
-//                myVideoView.setVideoURI(video);
-//                myVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-//                    public void onPrepared(MediaPlayer mp) {
-//                        progressDialog.dismiss();
-//                        // videoViewOriginal.setAlpha(1.0f);
-//                        if(seek) {
-//                            myVideoView.seekTo(position);
-//                        }
-//                        myVideoView.start();
-//                    }
-//                });
-//            } catch (Exception e) {
-//                progressDialog.dismiss();
-//            }
-//        }
     }
+
 }
