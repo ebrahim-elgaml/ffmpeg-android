@@ -2,7 +2,9 @@ package com.example.ebrahim_elgaml.ffmpeg_android;
 
 import android.app.ProgressDialog;
 import android.content.Context;
-import android.graphics.PixelFormat;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -10,16 +12,23 @@ import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.widget.MediaController;
+import android.widget.RelativeLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
-import android.widget.Toast;
-import android.widget.VideoView;
 
 import com.github.hiteshsondhi88.libffmpeg.ExecuteBinaryResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.FFmpeg;
 import com.github.hiteshsondhi88.libffmpeg.LoadBinaryResponseHandler;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegCommandAlreadyRunningException;
 import com.github.hiteshsondhi88.libffmpeg.exceptions.FFmpegNotSupportedException;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -38,122 +47,129 @@ public class MainActivity extends AppCompatActivity {
     private  boolean isFinshied = false;
     private int position = 0;
     private boolean seek = false;
+    private ScrollView myScroll;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         myTextView = (TextView)(findViewById(R.id.mTextView));
         myVideoView = (AlphaVideoView)(findViewById(R.id.videoView));
+
+//        myScroll = (ScrollView)(findViewById(R.id.scrollView));
+//        myScroll.setBackgroundColor(Color.RED);
         myVideoView.setVideoViewListener(mVideoViewListener);
         myVideoView.setOnCompletionListener(mVideoViewCompleteListener);
         Drawable d = Drawable.createFromPath(IMAGE_PATH + "bg.jpg");
+        myVideoView.getRootView().setBackground(d);
+//        myScroll.setBackground(d);
+        myVideoView.setBackgroundColor(Color.BLUE);
         mediaControls = new MediaController(this);
-//        myVideoView.setBackground(d);
         videoURI = Uri.parse(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts");
         startTime = System.currentTimeMillis();
-//        new MyThread().start();
-        final String[] command = formFFMPEGCommand(15, 29.27, "bg.jpg", "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1");
-        final Context myContext = this;
-        final FFmpeg ffmpeg = FFmpeg.getInstance(myContext);
-
-        try {
-            ffmpeg.loadBinary(new LoadBinaryResponseHandler() {
-                @Override
-                public void onStart() {
+        RelativeLayout yourRelLay = (RelativeLayout) myVideoView.getParent();
+        myVideoView.getRootView().addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+                if (left == 0 && top == 0 && right == 0 && bottom == 0) {
+                    return;
                 }
+                saveBitmap(loadBitmapFromView(myVideoView.getRootView(), myVideoView.getRootView().getWidth(), myVideoView.getRootView().getHeight()));
+            }
+        });
+//        Log.i("FILE_TRAC", "LAYOUT WIDTH : " + yourRelLay.getWidth() + " H : " + yourRelLay.getHeight());
 
-                @Override
-                public void onFailure() {
-                }
-
-                @Override
-                public void onSuccess() {
-                    try {
-                        ffmpeg.execute(command, new ExecuteBinaryResponseHandler() {
-                            @Override
-                            public void onStart() {
-                                progressDialog = ProgressDialog.show(myContext, "",
-                                        "Buffering video...", true);
-                                progressDialog.setCancelable(true);
-                                startTime = System.currentTimeMillis();
-                                Log.i("FFMPEG_TRAC", "STARETED");
+//        final String[] command = formFFMPEGCommand(15, 29.27, "bg.jpg", "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1");
+//        final Context myContext = this;
+//        final FFmpeg ffmpeg = FFmpeg.getInstance(myContext);
+//        try {
+//            ffmpeg.loadBinary(new LoadBinaryResponseHandler() {
+//                @Override
+//                public void onStart() {
+//                }
 //
-                            }
-                            @Override
-                            public void onProgress(String message) {
-                                if(myVideoView.getCurrentPosition() <= 0){
-                                    if(System.currentTimeMillis() - startTime > 3000 ) {
-                                        playVideoOriginal();
-                                        seek = true;
-                                        startTime = System.currentTimeMillis();
-
-                                    }
-                                }else{
-                                    if( myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 1000){
-//                                        myVideoView.post(new Runnable() {
-//                                            @Override
-//                                            public void run() {
-//                                                if(myVideoView.canSeekForward()) {
-//                                                    if (myVideoView.getCurrentPosition() > myVideoView.getDuration()) {
-//                                                        position = myVideoView.getDuration();
-//                                                    } else {
-//                                                        position = myVideoView.getCurrentPosition();
-//                                                    }
-//                                                    if(position > 0) {
-//                                                        playVideoOriginal();
-//                                                    }
-//                                                }
-//                                            }
-//                                        });
-                                        startTime = System.currentTimeMillis();
-                                        myCounter++;
-                                    }
-                                }
-                                Log.i("FFMPEG_TRAC", message);
-                            }
-                            @Override
-                            public void onFailure(String message) {
-//                                Toast.makeText(myContext, message, Toast.LENGTH_LONG);
-                                Log.i("FFMPEG_TRAC", message);
-                            }
-
-                            @Override
-                            public void onSuccess(String message) {
-//                                Toast.makeText(myContext, message, Toast.LENGTH_LONG);
-                                isFinshied = true;
-                                myTextView.post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        myTextView.setText("Time elapsed in milliseconds : " + (System.currentTimeMillis() - startTime) + ", Counter : " + myCounter);
-                                    }
-                                });
-                                playVideoOriginal();
-                                Log.i("FFMPEG_TRAC", message);
-                            }
-
-                            @Override
-                            public void onFinish() {
-//                                Toast.makeText(myContext, "Fininsh", Toast.LENGTH_LONG);
-                                Log.i("FFMPEG_TRAC", "FINISH");
-                                isFinshied = true;
-                            }
-                        });
-                    } catch (FFmpegCommandAlreadyRunningException e) {
-                        // Handle if FFmpeg is already running
-                    }
-                }
-
-                @Override
-                public void onFinish() {
-                }
-            });
-        } catch (FFmpegNotSupportedException e) {
-            // Handle if FFmpeg is not supported by device
-        }
+//                @Override
+//                public void onFailure() {
+//                }
+//
+//                @Override
+//                public void onSuccess() {
+//                    try {
+//                        ffmpeg.execute(command, new ExecuteBinaryResponseHandler() {
+//                            @Override
+//                            public void onStart() {
+//                                progressDialog = ProgressDialog.show(myContext, "",
+//                                        "Buffering video...", true);
+//                                progressDialog.setCancelable(true);
+//                                startTime = System.currentTimeMillis();
+//                                Log.i("FFMPEG_TRAC", "STARETED");
+//                            }
+//                            @Override
+//                            public void onProgress(String message) {
+//                                if(myVideoView.getCurrentPosition() <= 0){
+//                                    if(System.currentTimeMillis() - startTime > 3000 ) {
+//                                        playVideoOriginal();
+//                                        seek = true;
+//                                        startTime = System.currentTimeMillis();
+//
+//                                    }
+//                                }
+//                                Log.i("FFMPEG_TRAC", message);
+//                            }
+//                            @Override
+//                            public void onFailure(String message) {
+//                                Log.i("FFMPEG_TRAC", message);
+//                            }
+//
+//                            @Override
+//                            public void onSuccess(String message) {
+//                                isFinshied = true;
+//                                myTextView.post(new Runnable() {
+//                                    @Override
+//                                    public void run() {
+//                                        myTextView.setText("Time elapsed in milliseconds : " + (System.currentTimeMillis() - startTime) + ", Counter : " + myCounter);
+//                                    }
+//                                });
+//                                playVideoOriginal();
+//                                Log.i("FFMPEG_TRAC", message);
+//                            }
+//
+//                            @Override
+//                            public void onFinish() {
+//                                isFinshied = true;
+//                                Log.i("FFMPEG_TRAC", "FINISH");
+//                                isFinshied = true;
+//
+//
+//                            }
+//                        });
+//                    } catch (FFmpegCommandAlreadyRunningException e) {
+//                        // Handle if FFmpeg is already running
+//                    }
+//                }
+//
+//                @Override
+//                public void onFinish() {
+//                }
+//            });
+//        } catch (FFmpegNotSupportedException e) {
+//            // Handle if FFmpeg is not supported by device
+//        }
 
 
     }
+    private int getRelativeLeft(View myView) {
+        if (myView.getParent() == myView.getRootView())
+            return myView.getLeft();
+        else
+            return myView.getLeft() + getRelativeLeft((View) myView.getParent());
+    }
 
+    private int getRelativeTop(View myView) {
+        if (myView.getParent() == myView.getRootView())
+            return myView.getTop();
+        else
+            return myView.getTop() + getRelativeTop((View) myView.getParent());
+    }
     // duration in seconds example : 22.1
     // SAR is string as "0:1"
     public static String[] formFFMPEGCommand(double frameRate, double duration, String bgPath, String videoColoredPath, String videoAlphaPath, String SAR){
@@ -210,69 +226,64 @@ public class MainActivity extends AppCompatActivity {
     {
         @Override
         public void onCompletion(MediaPlayer mp) {
+
             if(!isFinshied) {
                 position = myVideoView.getDuration() - 100;
                 playVideoOriginal();
+            }else{
+
+//                myVideoView.setAlpha(1.0f);
             }
         }
 
     };
+    public static Bitmap loadBitmapFromView(View v, int width, int height) {
+        Bitmap b = Bitmap.createBitmap(v.getWidth() , v.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Log.i("FILE_TRAC", "WIDTH :  " + width + ", HEIGHT : " + height);
+
+        v.layout(0, 0, v.getWidth(), v.getHeight());
+        v.draw(c);
+        return b;
+    }
+    public static void  saveBitmap(Bitmap b){
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        b.compress(Bitmap.CompressFormat.JPEG, 40, bytes);
+        File f = new File(IMAGE_PATH, "screenshot.jpg");
+        try {
+            f.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        FileOutputStream fo = null;
+        try {
+            fo = new FileOutputStream(f);
+            fo.write(bytes.toByteArray());
+            Log.i("FILE_TRAC", "SAVING FILE");
+            fo.flush();
+            fo.close();
+        } catch (FileNotFoundException e) {
+            Log.i("FILE_TRAC", e.getMessage());
+            e.printStackTrace();
+        } catch (IOException e) {
+            Log.i("FILE_TRAC", e.getMessage());
+            e.printStackTrace();
+        }
+    }
     public  void playVideoOriginal() {
         try {
-            Log.i("THREAD_TRAC", "SEEK : " + seek + " And postion is : " +  position);
-            if(seek && position <= 0) {
-                position = myVideoView.getDuration() - 100;
+            Log.i("THREAD_TRAC", "SEEK : " + seek + " And postion is : " + position);
+            if(!seek) {
+                progressDialog.dismiss();
             }
             myVideoView.setVideoURI(videoURI);
-            progressDialog.dismiss();
             myVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 public void onPrepared(MediaPlayer mp) {
                     myVideoView.seekTo(position);
-//                    myVideoView.seekTo(position);
-//                    if(seek) {
-//                        myVideoView.seekTo(position);
-//                    }else{
-//                        myVideoView.seekTo(0);
-//                        progressDialog.dismiss();
-//                        seek = true;
-//                    }
-
                 }
             });
         } catch (Exception e) {
             progressDialog.dismiss();
         }
     }
-
-    public class MyThread extends Thread {
-        public MyThread(){
-            super("My Thread");
-        }
-        public void run() {
-            while (!isFinshied) {
-                        if (myVideoView.getCurrentPosition() <= 0) {
-                            if (System.currentTimeMillis() - startTime > 6000) {
-                                playVideoOriginal();
-                                seek = true;
-                                startTime = System.currentTimeMillis();
-
-                            }
-                        } else {
-                            if (myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 500) {
-                                if (myVideoView.canSeekForward()) {
-                                    if (myVideoView.getCurrentPosition() > myVideoView.getDuration()) {
-                                        position = myVideoView.getDuration() - 100;
-                                    } else {
-                                        position = myVideoView.getCurrentPosition();
-                                    }
-                                    playVideoOriginal();
-                                }
-                                startTime = System.currentTimeMillis();
-                                myCounter++;
-                            }
-                        }
-            }
-        }
-    }
-
 }
