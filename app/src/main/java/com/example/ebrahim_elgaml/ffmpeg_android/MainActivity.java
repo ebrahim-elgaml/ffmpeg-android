@@ -45,30 +45,30 @@ public class MainActivity extends AppCompatActivity {
     private Button button1;
     private Button button2;
     private Button button3;
+    private boolean playNewVideo = false;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         myTextView = (TextView)(findViewById(R.id.mTextView));
-        myVideoView = (AlphaVideoView)(findViewById(R.id.videoView));
-//        button1 = (Button)(findViewById(R.id.button));
-//        button2 = (Button)(findViewById(R.id.button2));
-//        button3 = (Button)(findViewById(R.id.button3));
-//        button1.setBackgroundColor(Color.parseColor("#ccff99"));
-//        button1.setTag(Color.parseColor("#ccff99"));
-//        button2.setBackgroundColor(Color.parseColor("#6666ff"));
-//        button2.setTag(Color.parseColor("#6666ff"));
-//        button3.setBackgroundColor(Color.parseColor("#cc0066"));
-//        button3.setTag(Color.parseColor("#cc0066"));
+        initVideoView();
+        button1 = (Button)(findViewById(R.id.button));
+        button2 = (Button)(findViewById(R.id.button2));
+        button3 = (Button)(findViewById(R.id.button3));
+        button1.setBackgroundColor(Color.parseColor("#ffffff"));
+        button1.setTag(1);
+        button2.setBackgroundColor(Color.parseColor("#000000"));
+        button2.setTag(Color.parseColor("#000000"));
+        button3.setBackgroundColor(Color.parseColor("#aaffee"));
+        button3.setTag(Color.parseColor("#aaffee"));
         myVideoView.getRootView().setBackgroundColor(Color.rgb(0xAA, 0xFF, 0xEE));
-        myVideoView.setVideoViewListener(mVideoViewListener);
-        myVideoView.setOnCompletionListener(mVideoViewCompleteListener);
         mediaControls = new MediaController(this);
-        videoURI = Uri.parse(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts");
+//        videoURI = Uri.parse(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts");
         startTime = System.currentTimeMillis();
         ffmpeg = FFmpeg.getInstance(this);
         progressDialog = ProgressDialog.show(this, "", "Buffering video...", true);
         progressDialog.setCancelable(true);
+        loadFFMPEGBinary();
 //        myVideoView.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
 //            @Override
 //            public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
@@ -83,6 +83,13 @@ public class MainActivity extends AppCompatActivity {
         String[] command = formFFMPEGCommand(15, 29.27, "bg.jpg", "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1", true, 320, 240);
         executeFFMPEGCommandPlayVideo(command);
 //        new FFMPEGThread(command).run();
+    }
+    public void initVideoView(){
+        myVideoView = null;
+        myVideoView = (AlphaVideoView)(findViewById(R.id.videoView));
+        myVideoView.setVideoViewListener(mVideoViewListener);
+        myVideoView.setOnCompletionListener(mVideoViewCompleteListener);
+        videoURI = Uri.parse(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts");
     }
     public void loadFFMPEGBinary(){
         try {
@@ -114,15 +121,20 @@ public class MainActivity extends AppCompatActivity {
             ffmpeg.execute(command, new ExecuteBinaryResponseHandler() {
                 @Override
                 public void onStart() {
-
                     startTime = System.currentTimeMillis();
                     Log.i("FFMPEG_TRAC", "STARETED");
                 }
                 @Override
                 public void onProgress(String message) {
                     int p = myVideoView.getCurrentPosition();
-                    if(p <= 0){
-                        if(System.currentTimeMillis() - startTime > 5000 ) {
+                    Log.i("PLAYED_NEW", " before if value : " + playNewVideo);
+                    if(p <= 0 || playNewVideo ){
+                        Log.i("PLAYED_NEW", " after if value : " + playNewVideo);
+                        if(System.currentTimeMillis() - startTime > 1000 ) {
+                            if(playNewVideo){
+                                playNewVideo = false;
+                                myVideoView.setAlpha(1f);
+                            }
                             playVideoOriginal();
                             seek = true;
                             startTime = System.currentTimeMillis();
@@ -170,8 +182,8 @@ public class MainActivity extends AppCompatActivity {
             bgPath = IMAGE_PATH + bgPath;
             inputs = new String[]{"-r", "" + frameRate, "-loop", "1", "-i", bgPath, "-i", videoColoredPath, "-i", videoAlphaPath, "-y", "-t", "1"};
         }else{
-            bgPath = "-f lavfi -i color=c="+ bgPath +":size=" + width + "x" + height;
-            inputs = new String[]{"-r", "" + frameRate, bgPath, "-i", videoColoredPath, "-i", videoAlphaPath, "-y", "-t", "1"};
+//            bgPath = "-f lavfi -i color=c="+ bgPath +":size=" + width + "x" + height;
+            inputs = new String[]{"-r", "" + frameRate, "-f", "lavfi", "-i", "color=c=" + bgPath +":size=" + "320" + "x" + "180", "-i", videoColoredPath, "-i", videoAlphaPath, "-y", "-t", "1"};
         }
         String[] output = new String[]{VIDEO_PATH + orgVideo + "_transparent.ts"};
         String[] command = new String[inputs.length + engineVideoParams.length + filters.length + output.length];
@@ -201,6 +213,7 @@ public class MainActivity extends AppCompatActivity {
         {
             //TODO what you want
             myVideoView.start();
+            progressDialog.dismiss();
         }
 
         @Override
@@ -222,7 +235,7 @@ public class MainActivity extends AppCompatActivity {
         public void onCompletion(MediaPlayer mp) {
             if(!isFinshied) {
 
-                position = myVideoView.getDuration() - 100;
+                position = myVideoView.getDuration();
                 playVideoOriginal();
                 myCounter++;
             }
@@ -235,6 +248,7 @@ public class MainActivity extends AppCompatActivity {
             if(!seek) {
                 progressDialog.dismiss();
             }
+            Log.i("PLAYED_NEW", " Progress : " + playNewVideo);
             Log.i("PLAY_TRAC","Position : " +  position + ", Loaded : " + (myVideoView.getDuration() - 100)) ;
             myVideoView.setVideoURI(videoURI);
             myVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
@@ -251,17 +265,46 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void backhroundColorChanged(int newColor){
+        Log.i("PLAYED_NEW", " BGCHANGE : " + "-------------------------------");
         if(ffmpeg.isFFmpegCommandRunning()){
             ffmpeg.killRunningProcesses();
         }
+        String[] command = formFFMPEGCommand(15, 29.27, String.format("#%06X", (0xFFFFFF & newColor)), "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1", false,  myVideoView.getWidth(), myVideoView.getHeight());
+        initVideoView();
+        position = 0 ;
+        seek = false;
         myVideoView.stopPlayback();
         myVideoView.setAlpha(0f);
-        ProgressDialog.show(this, "", "Buffering video...", true);
+        progressDialog = ProgressDialog.show(this, "", "Buffering video...", true);
         startTime = System.currentTimeMillis();
-        executeFFMPEGCommandPlayVideo(formFFMPEGCommand(15, 29.27, String.format("#%06X", (0xFFFFFF & newColor)), "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1", false,  myVideoView.getWidth(), myVideoView.getHeight()));
+        playNewVideo = true;
+        executeFFMPEGCommandPlayVideo(command);
+    }
+    public void playImage(){
+        Log.i("PLAYED_NEW", " BGCHANGE : " + "-------------------------------");
+        if(ffmpeg.isFFmpegCommandRunning()){
+            ffmpeg.killRunningProcesses();
+        }
+        String[] command = formFFMPEGCommand(15, 29.27, "bg.jpg", "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1", true, 320, 240);
+        initVideoView();
+        position = 0 ;
+        seek = false;
+        myVideoView.stopPlayback();
+        myVideoView.setAlpha(0f);
+        progressDialog = ProgressDialog.show(this, "", "Buffering video...", true);
+        startTime = System.currentTimeMillis();
+        playNewVideo = true;
+        executeFFMPEGCommandPlayVideo(command);
     }
     public void changeBackground(View view) {
-        backhroundColorChanged((int) ((Button) view).getTag());
+        int color = (int) ((Button) view).getTag();
+        if(color == 1){
+            playImage();
+        }else{
+            view.getRootView().setBackgroundColor(color);
+            backhroundColorChanged(color);
+        }
+
     }
 
     public class FFMPEGThread extends Thread{
