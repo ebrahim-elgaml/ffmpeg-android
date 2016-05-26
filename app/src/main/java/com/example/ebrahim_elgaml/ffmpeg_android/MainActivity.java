@@ -2,6 +2,7 @@ package com.example.ebrahim_elgaml.ffmpeg_android;
 
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
@@ -10,6 +11,8 @@ import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.MediaController;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -38,28 +41,55 @@ public class MainActivity extends AppCompatActivity {
     private  boolean isFinshied = false;
     private int position = 0;
     private boolean seek = false;
+    private FFmpeg ffmpeg;
+    private Button button1;
+    private Button button2;
+    private Button button3;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         myTextView = (TextView)(findViewById(R.id.mTextView));
         myVideoView = (AlphaVideoView)(findViewById(R.id.videoView));
+//        button1 = (Button)(findViewById(R.id.button));
+//        button2 = (Button)(findViewById(R.id.button2));
+//        button3 = (Button)(findViewById(R.id.button3));
+//        button1.setBackgroundColor(Color.parseColor("#ccff99"));
+//        button1.setTag(Color.parseColor("#ccff99"));
+//        button2.setBackgroundColor(Color.parseColor("#6666ff"));
+//        button2.setTag(Color.parseColor("#6666ff"));
+//        button3.setBackgroundColor(Color.parseColor("#cc0066"));
+//        button3.setTag(Color.parseColor("#cc0066"));
+        myVideoView.getRootView().setBackgroundColor(Color.rgb(0xAA, 0xFF, 0xEE));
         myVideoView.setVideoViewListener(mVideoViewListener);
         myVideoView.setOnCompletionListener(mVideoViewCompleteListener);
-        Drawable d = Drawable.createFromPath(IMAGE_PATH + "bg.jpg");
         mediaControls = new MediaController(this);
-//        myVideoView.setBackground(d);
         videoURI = Uri.parse(VIDEO_PATH + "ojob4_Full1_pre_full.mp4" + "_transparent.ts");
         startTime = System.currentTimeMillis();
-//        new MyThread().start();
-        final String[] command = formFFMPEGCommand(15, 29.27, "bg.jpg", "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1");
-        final Context myContext = this;
-        final FFmpeg ffmpeg = FFmpeg.getInstance(myContext);
-
+        ffmpeg = FFmpeg.getInstance(this);
+        progressDialog = ProgressDialog.show(this, "", "Buffering video...", true);
+        progressDialog.setCancelable(true);
+//        myVideoView.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+//            @Override
+//            public void onLayoutChange(View v, int left, int top, int right, int bottom, int oldLeft, int oldTop, int oldRight, int oldBottom) {
+//                String[] command = formFFMPEGCommand(15, 29.27, "bg.jpg", "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1", true, myVideoView.getWidth(), myVideoView.getHeight());
+//                progressDialog.setCancelable(true);
+//    //          myVideoView.change
+//
+//        //      loadFFMPEGBinary();
+////                executeFFMPEGCommandPlayVideo(command);
+//            }
+//        });
+        String[] command = formFFMPEGCommand(15, 29.27, "bg.jpg", "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1", true, 320, 240);
+        executeFFMPEGCommandPlayVideo(command);
+//        new FFMPEGThread(command).run();
+    }
+    public void loadFFMPEGBinary(){
         try {
             ffmpeg.loadBinary(new LoadBinaryResponseHandler() {
                 @Override
                 public void onStart() {
+
                 }
 
                 @Override
@@ -68,79 +98,7 @@ public class MainActivity extends AppCompatActivity {
 
                 @Override
                 public void onSuccess() {
-                    try {
-                        ffmpeg.execute(command, new ExecuteBinaryResponseHandler() {
-                            @Override
-                            public void onStart() {
-                                progressDialog = ProgressDialog.show(myContext, "",
-                                        "Buffering video...", true);
-                                progressDialog.setCancelable(true);
-                                startTime = System.currentTimeMillis();
-                                Log.i("FFMPEG_TRAC", "STARETED");
-//
-                            }
-                            @Override
-                            public void onProgress(String message) {
-                                if(myVideoView.getCurrentPosition() <= 0){
-                                    if(System.currentTimeMillis() - startTime > 3000 ) {
-                                        playVideoOriginal();
-                                        seek = true;
-                                        startTime = System.currentTimeMillis();
 
-                                    }
-                                }else{
-                                    if( myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 1000){
-//                                        myVideoView.post(new Runnable() {
-//                                            @Override
-//                                            public void run() {
-//                                                if(myVideoView.canSeekForward()) {
-//                                                    if (myVideoView.getCurrentPosition() > myVideoView.getDuration()) {
-//                                                        position = myVideoView.getDuration();
-//                                                    } else {
-//                                                        position = myVideoView.getCurrentPosition();
-//                                                    }
-//                                                    if(position > 0) {
-//                                                        playVideoOriginal();
-//                                                    }
-//                                                }
-//                                            }
-//                                        });
-                                        startTime = System.currentTimeMillis();
-                                        myCounter++;
-                                    }
-                                }
-                                Log.i("FFMPEG_TRAC", message);
-                            }
-                            @Override
-                            public void onFailure(String message) {
-//                                Toast.makeText(myContext, message, Toast.LENGTH_LONG);
-                                Log.i("FFMPEG_TRAC", message);
-                            }
-
-                            @Override
-                            public void onSuccess(String message) {
-//                                Toast.makeText(myContext, message, Toast.LENGTH_LONG);
-                                isFinshied = true;
-                                myTextView.post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        myTextView.setText("Time elapsed in milliseconds : " + (System.currentTimeMillis() - startTime) + ", Counter : " + myCounter);
-                                    }
-                                });
-                                playVideoOriginal();
-                                Log.i("FFMPEG_TRAC", message);
-                            }
-
-                            @Override
-                            public void onFinish() {
-//                                Toast.makeText(myContext, "Fininsh", Toast.LENGTH_LONG);
-                                Log.i("FFMPEG_TRAC", "FINISH");
-                                isFinshied = true;
-                            }
-                        });
-                    } catch (FFmpegCommandAlreadyRunningException e) {
-                        // Handle if FFmpeg is already running
-                    }
                 }
 
                 @Override
@@ -150,19 +108,71 @@ public class MainActivity extends AppCompatActivity {
         } catch (FFmpegNotSupportedException e) {
             // Handle if FFmpeg is not supported by device
         }
-
-
     }
+    public void executeFFMPEGCommandPlayVideo(String[] command){
+        try {
+            ffmpeg.execute(command, new ExecuteBinaryResponseHandler() {
+                @Override
+                public void onStart() {
 
+                    startTime = System.currentTimeMillis();
+                    Log.i("FFMPEG_TRAC", "STARETED");
+                }
+                @Override
+                public void onProgress(String message) {
+                    int p = myVideoView.getCurrentPosition();
+                    if(p <= 0){
+                        if(System.currentTimeMillis() - startTime > 5000 ) {
+                            playVideoOriginal();
+                            seek = true;
+                            startTime = System.currentTimeMillis();
+                        }
+                    }
+                    Log.i("FFMPEG_TRAC", message);
+                }
+                @Override
+                public void onFailure(String message) {
+                    Log.i("FFMPEG_TRAC", message);
+                }
+
+                @Override
+                public void onSuccess(String message) {
+                    isFinshied = true;
+                    myTextView.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            myTextView.setText("Time elapsed in milliseconds : " + (System.currentTimeMillis() - startTime) + ", Counter : " + myCounter);
+                        }
+                    });
+                    playVideoOriginal();
+                    Log.i("FFMPEG_TRAC", message);
+                }
+
+                @Override
+                public void onFinish() {
+                    Log.i("FFMPEG_TRAC", "FINISH");
+                    isFinshied = true;
+                }
+            });
+        } catch (FFmpegCommandAlreadyRunningException e) {
+            // Handle if FFmpeg is already running
+        }
+    }
     // duration in seconds example : 22.1
     // SAR is string as "0:1"
-    public static String[] formFFMPEGCommand(double frameRate, double duration, String bgPath, String videoColoredPath, String videoAlphaPath, String SAR){
+    public static String[] formFFMPEGCommand(double frameRate, double duration, String bgPath, String videoColoredPath, String videoAlphaPath, String SAR, boolean isBGImage, int width, int height){
         String orgVideo = videoColoredPath;
         videoColoredPath = VIDEO_PATH + videoColoredPath;
         videoAlphaPath = VIDEO_PATH + videoAlphaPath;
-        bgPath = IMAGE_PATH + bgPath;
         String[] filters = new String[]{"-filter_complex", "[0:v]setsar=sar=" + SAR + ", format=pix_fmts=yuv420p[cimg];[1:v]scale=320x180[corg];[2:v]scale=320x180[cmask];[cimg][corg][cmask]maskedmerge[out]", "-map", "[out]", "-map", "1:a", "-t", ""+duration};
-        String[] inputs = new String[]{"-r", "" + frameRate, "-loop", "1", "-i", bgPath, "-i", videoColoredPath, "-i", videoAlphaPath, "-y", "-t", "1"};
+        String[] inputs;
+        if(isBGImage) {
+            bgPath = IMAGE_PATH + bgPath;
+            inputs = new String[]{"-r", "" + frameRate, "-loop", "1", "-i", bgPath, "-i", videoColoredPath, "-i", videoAlphaPath, "-y", "-t", "1"};
+        }else{
+            bgPath = "-f lavfi -i color=c="+ bgPath +":size=" + width + "x" + height;
+            inputs = new String[]{"-r", "" + frameRate, bgPath, "-i", videoColoredPath, "-i", videoAlphaPath, "-y", "-t", "1"};
+        }
         String[] output = new String[]{VIDEO_PATH + orgVideo + "_transparent.ts"};
         String[] command = new String[inputs.length + engineVideoParams.length + filters.length + output.length];
         int start = 0;
@@ -211,32 +221,28 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onCompletion(MediaPlayer mp) {
             if(!isFinshied) {
+
                 position = myVideoView.getDuration() - 100;
                 playVideoOriginal();
+                myCounter++;
             }
         }
 
     };
     public  void playVideoOriginal() {
         try {
-            Log.i("THREAD_TRAC", "SEEK : " + seek + " And postion is : " +  position);
-            if(seek && position <= 0) {
-                position = myVideoView.getDuration() - 100;
+            Log.i("THREAD_TRAC", "SEEK : " + seek + " And postion is : " + position);
+            if(!seek) {
+                progressDialog.dismiss();
             }
+            Log.i("PLAY_TRAC","Position : " +  position + ", Loaded : " + (myVideoView.getDuration() - 100)) ;
             myVideoView.setVideoURI(videoURI);
-            progressDialog.dismiss();
             myVideoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
                 public void onPrepared(MediaPlayer mp) {
-                    myVideoView.seekTo(position);
-//                    myVideoView.seekTo(position);
-//                    if(seek) {
-//                        myVideoView.seekTo(position);
-//                    }else{
-//                        myVideoView.seekTo(0);
-//                        progressDialog.dismiss();
-//                        seek = true;
-//                    }
+                    //if (myVideoView.getDuration() - position >= 2000) {
 
+                        myVideoView.seekTo(position);
+                    //}
                 }
             });
         } catch (Exception e) {
@@ -244,34 +250,28 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public class MyThread extends Thread {
-        public MyThread(){
-            super("My Thread");
+    public void backhroundColorChanged(int newColor){
+        if(ffmpeg.isFFmpegCommandRunning()){
+            ffmpeg.killRunningProcesses();
         }
-        public void run() {
-            while (!isFinshied) {
-                        if (myVideoView.getCurrentPosition() <= 0) {
-                            if (System.currentTimeMillis() - startTime > 6000) {
-                                playVideoOriginal();
-                                seek = true;
-                                startTime = System.currentTimeMillis();
+        myVideoView.stopPlayback();
+        myVideoView.setAlpha(0f);
+        ProgressDialog.show(this, "", "Buffering video...", true);
+        startTime = System.currentTimeMillis();
+        executeFFMPEGCommandPlayVideo(formFFMPEGCommand(15, 29.27, String.format("#%06X", (0xFFFFFF & newColor)), "ojob4_Full1_pre_full.mp4", "ojob4_Full1_pre_full.mp4_alpha.mp4", "0:1", false,  myVideoView.getWidth(), myVideoView.getHeight()));
+    }
+    public void changeBackground(View view) {
+        backhroundColorChanged((int) ((Button) view).getTag());
+    }
 
-                            }
-                        } else {
-                            if (myVideoView.getDuration() - myVideoView.getCurrentPosition() <= 500) {
-                                if (myVideoView.canSeekForward()) {
-                                    if (myVideoView.getCurrentPosition() > myVideoView.getDuration()) {
-                                        position = myVideoView.getDuration() - 100;
-                                    } else {
-                                        position = myVideoView.getCurrentPosition();
-                                    }
-                                    playVideoOriginal();
-                                }
-                                startTime = System.currentTimeMillis();
-                                myCounter++;
-                            }
-                        }
-            }
+    public class FFMPEGThread extends Thread{
+        private String[] command;
+        public FFMPEGThread(String[] command){
+            super("FFMPEG THREAD");
+            this.command = command;
+        }
+        public void run(){
+            executeFFMPEGCommandPlayVideo(command);
         }
     }
 
